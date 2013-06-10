@@ -1,0 +1,35 @@
+*** Akatus for WooCommerce Changelog ***
+
+2013.04.14 - version 1.9
+	* Removido código desnecessário
+	* Adicionado suporte a localização
+	* Corrigido links da documentação e exemplos
+
+2013.03.28 - version 1.8
+	* Adicionado os itens de endereço ao XML
+	* Adicionado a versão do plugin no sistema de logs
+	* Adicionado lista dos produtos existentes no pedido
+	* Suporte ao WC 2.0
+	* Alterado o texto de domínio para internacionalização
+	* Alterado o ID do plugin de Akatus para akatus
+	* 
+
+2013.01.14 - version 1.7
+	* Adicionada verificação entre valores cobrados na loja e no gateway, se o valor for diferente não altera o status do pedido
+	* Corrigido o bug que criava dois registros de pagamento na Akatus
+
+2013.01.03 - version 1.6
+	* Corrigidas as chamadas para funções depreciadas
+	* Corrigida declaração duplicada de 'process_payment'
+	* Corrigido o processamento do XML quando algum erro é retornado da Akatus
+	* Corrigido retorno de dados (NIP)
+
+2013.01.02 - version 1.5
+	* Texto de domínio corrigido
+	* Adicionado tratamento a URL existente dentro da tag url_retorno do XML de pagamento (quando o ambiente é 'dev')
+	* Corrigido o processamento do pagamento
+	
+2012.12.29 - version 1.0
+	* Vesão inicial
+	
+	
