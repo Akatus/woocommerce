@@ -387,33 +387,40 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				$this->pedido_id = $order->id;
 
 				$retorno = $this->existe_transacao( $order );
-                $status = $retorno['status'];
 
 			    if ($this->debug=='yes') $this->log->add( $this->id, 'Retorno de existe_transacao: '. print_r( $retorno, true ) );
 
                 switch ($this->payment_type) {
                     case 'boleto':
-                    case 'tef':
-                        
-                        $html = '<form action="'. esc_url( $this->url_retorno( $retorno ) ) .'" method="get" id="akatus_payment_form">
-                                <input type="submit" class="button-alt" id="submit_akatus_payment_form" value="Efetuar pagamento" />
+                        $html = '<form action="'. esc_url( $this->url_retorno( $retorno->url_retorno ) ) .'" method="get" id="akatus_payment_form" target="_blank">
+                                <input type="submit" class="button-alt" id="submit_akatus_payment_form" value="Gerar Boleto" />
+                                </form>';
+                        break;
+
+                    case 'tef_itau':
+                    case 'tef_bradesco':
+                    case 'tef_bb':
+                        $html = '<form action="'. esc_url( $this->url_retorno( $retorno->url_retorno ) ) .'" method="get" id="akatus_payment_form" target="_blank">
+                                <input type="submit" class="button-alt" id="submit_akatus_payment_form" value="Efetuar TEF" />
                                 </form>';
                         break;
                     
                     default:
-                        if($status === 'erro'){
+                        if($retorno->status === 'erro'){
                             $html  ="<h3>Desculpe, não foi possível concluir o seu pedido.</h3>";
                             $html .="<p>Tente novamente. Se o problema persistir, entre em contato com o administrador da loja.</p>";
                             
-                            if ($this->debug=='yes') $this->log->add( $this->id, 'Token inválido/falso: '. $retorno['descricao'] );
+                            if ($this->debug=='yes') $this->log->add( $this->id, 'Token inválido/falso: '. $retorno->descricao );
 
-                        } else if($status === 'Em Análise' || $status === 'Aprovado') {
+                        } else if($retorno->status === 'Em Análise' || $retorno->status === 'Aprovado') {
                             $html  ="<h3>Seu pedido foi realizado com sucesso.</h3>";
                         } else {
                             $html  ="<h3>Pagamento não autorizado. Consulte a sua operadora de cartão de crédito para maiores informações.</h3>";
                         }
                         break;
                 }
+
+                echo $html;
 
                 $woocommerce->session->bandeira_cartao = null;
                 $woocommerce->session->nome_cartao = null;
@@ -492,8 +499,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				        <frete_total>0</frete_total>
 				        <moeda>BRL</moeda>
 				        <referencia>'. $order->id .'</referencia>
-				        <meio_de_pagamento>'. $this->get_payment_type() .'</meio_de_pagamento>
+                        <meio_de_pagamento>'. $this->get_payment_type() .'</meio_de_pagamento>';
 
+                if ($this->payment_type === 'cartao') {
+                    $xml .= '
                         <numero>'. $woocommerce->session->numero_cartao .'</numero>
 						<parcelas>'. $woocommerce->session->parcelas_cartao .'</parcelas>
 						<codigo_de_seguranca>'. $woocommerce->session->cvv_cartao .'</codigo_de_seguranca>
@@ -502,10 +511,12 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 							<nome>'. $woocommerce->session->nome_cartao .'</nome>
 							<cpf>'. $woocommerce->session->cpf_cartao .'</cpf>
 							<telefone>'. $woocommerce->session->telefone_cartao .'</telefone>
-						</portador>
+						</portador>';
+                
+                }
 
-				    </transacao>
-				    
+                $xml .= '
+				    </transacao>				    
 				</carrinho>';
 				
 				if($this->debug=='yes') $this->log->add( $this->id, 'XML '. $xml );
@@ -556,62 +567,24 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		    protected function existe_transacao( $order ){
 		    	global $post;
 		    	
+                $respostaXML = $this->processa_retorno( $this->request_token_API( $order ) );
 
-				$transacao = get_post_meta( $order->id, 'akatus_transacao', true );
-				if ($this->debug=='yes') $this->log->add( $this->id, 'Transação existente: '. $transacao );
-				
-				
-				// Verificando se o carrinho já foi utilizado
-				if( $transacao == '' ){
-					
-					
-					// requisita o token e processa o retorno
-					$respostaXML = $this->processa_retorno( $this->request_token_API( $order ) );
+                if ($this->debug=='yes') $this->log->add( $this->id, 'Criando transação: '. $transacao );
+                
+                $carrinho 		= str_replace( '', '', $respostaXML->carrinho );
+                $url_retorno	= strval($this->url_retorno( $respostaXML->url_retorno ));
+                $transacao		= str_replace( '', '', $respostaXML->transacao );
 
-					/**
-					 * Caso o retorno seja um array iremos informar
-					 * ao programa, pois trata-se de um erro 
-					 * finalizamos o processamento do aplicativo
-					 */
-					if( is_array( $respostaXML ) ){
-						return $respostaXML;
-					}
-					
-					
-					
-					/**
-					 * Não existia registros desta transação 
-					 * então vamos cria-los
-					 */
-					if ($this->debug=='yes') $this->log->add( $this->id, 'Criando transação: '. $transacao );
-					
-					
-					$carrinho 		= str_replace( '', '', $respostaXML->carrinho );
-                    $url_retornoXML	= $this->url_retorno( $respostaXML->url_retorno );
-                    $url_retorno    = (string) $url_retornoXML[0];
-					$transacao		= str_replace( '', '', $respostaXML->transacao );
+                // código do carrinho na Akatus
+                update_post_meta( $post->ID, 'akatus_carrinho', $carrinho );
+                
+                // código da transação na Akatus
+                update_post_meta( $post->ID, 'akatus_transacao', $transacao );
 
-					// código do carrinho na Akatus
-					update_post_meta( $post->ID, 'akatus_carrinho', $carrinho );
-					
-					// código da transação na Akatus
-					update_post_meta( $post->ID, 'akatus_transacao', $transacao );
-
-					// Endereço do boleto na akatus
-					update_post_meta( $post->ID, 'akatus_url_retorno', $url_retorno );
-				}else{
-					
-					/**
-					 * Existem registros desta transação 
-					 * então vamos reutiliza-los
-					 */
-					if ($this->debug=='yes') $this->log->add( $this->id, 'Recuperando dados da transação: '. $transacao );
-
-					// recupera a URL do carrinho anterior
-					$url_retorno = get_post_meta( $post->ID, 'akatus_url_retorno', true );
-				}
+                // Endereço do boleto na akatus
+                update_post_meta( $post->ID, 'akatus_url_retorno', $url_retorno );
 		    	
-				return $url_retorno;
+				return $respostaXML;
 		    }
 			
 			
@@ -634,13 +607,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				
 				// houve algum erro?
 				if( $respostaXML->status == 'erro' ){
-					
 					if($this->debug=='yes') $this->log->add( $this->id, 'Houve um erro: '. $respostaXML->descricao );
-					
-					// Descrição do erro
-					return array( 'descricao' => $respostaXML->descricao, 'status' => false );
 				}
-				
 				
 				return $respostaXML;
 			}
