@@ -409,7 +409,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                         } else if($status === 'Em Análise' || $status === 'Aprovado') {
                             $html  ="<h3>Seu pedido foi realizado com sucesso.</h3>";
-                        } else ($status === 'Cancelado') {
+                        } else {
                             $html  ="<h3>Pagamento não autorizado. Consulte a sua operadora de cartão de crédito para maiores informações.</h3>";
                         }
                         break;
