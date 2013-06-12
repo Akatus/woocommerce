@@ -146,29 +146,17 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 									'description' => __( 'Please enter your Akatus email address; this is needed in order to take payment.', 'WC_Akatus' ), 
 									'default' => ''
 								),
-					'key' => array(
-									'title' => __( 'Akatus key', 'WC_Akatus' ), 
-									'type' => 'text', 
-									'description' => __( 'Please enter your Akatus token; this is needed in order to take payment. See <a href="https://www.akatus.com/painel/cart/token" target="_blank">Token of security</a>', 'WC_Akatus' ), 
-									'default' => ''
-								),
 					'nip' => array(
-									'title' => __( 'What is your nip code?', 'WC_Akatus' ), 
+									'title' => __( 'Token NIP', 'WC_Akatus' ), 
 									'type' => 'text', 
 									'description' => __( 'This is used to connect in Akatus API. Change only if you change in your Akatus account. See <a href="https://www.akatus.com/painel/cart/token" target="_blank">Transaction code</a>', 'WC_Akatus' ), 
 									'default' => ''
 								),
-					'payment_type' => array(
-									'title' => __( 'Qual meio de pagamento disponibilizar?', 'WC_Akatus' ), 
-									'type' => 'select', 
-									'options' => array(
-										'boleto' => __( "Boleto bancário", 'WC_Akatus' ), 
-										'cartao' => __( "Cartão de crédito", 'WC_Akatus' ), 
-										'tef_itau' => __( "Transfêrencia eletrônica Itaú", 'WC_Akatus' ), 
-										'tef_bradesco' => __( "Transfêrencia eletrônica Bradesco", 'WC_Akatus' )
-									),
-									'description' => __( 'This is used to choose what is the payment method to your store. See <a href="https://www.akatus.com/painel/payment_methods" target="_blank">Transaction code</a>', 'WC_Akatus' ), 
-									'default' => 'boleto'
+					'key' => array(
+									'title' => __( 'API Key', 'WC_Akatus' ), 
+									'type' => 'text', 
+									'description' => __( 'Please enter your Akatus token; this is needed in order to take payment. See <a href="https://www.akatus.com/painel/cart/token" target="_blank">Token of security</a>', 'WC_Akatus' ), 
+									'default' => ''
 								),
 					'ambiente' => array(
 									'title' => __( 'Ambiente', 'WC_Akatus' ), 
@@ -264,11 +252,45 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		    
             function payment_fields() {
                 global $woocommerce;
+                $cartoes_credito = array();
+                $bancos_tef = array();
 
                 if ($this->description) echo wpautop(wptexturize($this->description)); 
+                
+                $xml = $this->get_meios_pagamento();
 
-                if ($this->payment_type === 'cartao') {
-                    $cartoes_credito = $this->get_cartoes_credito($this->get_meios_pagamento());
+                foreach ($xml->meios_de_pagamento->meio_de_pagamento as $meio_de_pagamento) {
+                    if(strval($meio_de_pagamento->descricao) === 'Boleto Bancário') {
+                        echo "<div>";
+                        echo "  <input type='radio' name='akatus' value='boleto'><label>Boleto</label>";
+                        echo "</div>";
+                    }
+
+                    if(strval($meio_de_pagamento->descricao) === 'TEF') {
+                        echo "<div>";
+                        echo "  <input type='radio' name='akatus' value='tef'><label>Transferência Eletrônica</label>";
+                        echo "</div>";
+                        foreach ($meio_de_pagamento->bandeiras->bandeira as $bandeira) {
+                            $codigo = strval($bandeira->codigo);
+                            $descricao = substr(strval($bandeira->descricao), 6, strlen($bandeira->descricao));
+                            echo "<div>";
+                            echo "  <input type='radio' name='tef' value='$codigo'><label>$descricao</label>";
+                            echo "</div>";
+                        }
+                    }
+
+                    if(strval($meio_de_pagamento->descricao) === 'Cartão de Crédito') {
+                        foreach ($meio_de_pagamento->bandeiras->bandeira as $bandeira) {
+                            $cartoes_credito[strval($bandeira->codigo)] = strval($bandeira->descricao);
+                        }
+                    }
+                }
+
+                if (! empty($cartoes_credito)) {
+                    echo "<div>";
+                    echo "  <input type='radio' name='akatus' value='cartao'><label>Cartão de Crédito</label>";
+                    echo "</div>";
+                        
                     $parcelamento = $this->get_parcelamento();
 
                     $juros =  str_replace("% ao mês","", $parcelamento["resposta"]["descricao"]);
@@ -361,8 +383,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
             public function validate_fields() {
                 global $woocommerce;
 
-                if ($this->payment_type === 'cartao') {
-                    $woocommerce->session->bandeira_cartao = isset($_POST['bandeira_cartao']) ? $_POST['bandeira_cartao'] : false;
+                $tipo_pagamento = $_POST['akatus'];
+
+                if ($tipo_pagamento === 'cartao') {
+                    $woocommerce->session->payment_type = $_POST['bandeira_cartao'];
                     $woocommerce->session->nome_cartao = $_POST['nome_cartao'];
                     $woocommerce->session->numero_cartao = $_POST['numero_cartao'];
                     $woocommerce->session->cpf_cartao = $_POST['cpf_cartao'];
@@ -372,7 +396,11 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     $woocommerce->session->parcelas_cartao = $_POST['parcelas_cartao'];
                     $woocommerce->session->telefone_cartao = $_POST['billing_phone'];
 
-                    $this->payment_type = $woocommerce->session->bandeira_cartao;
+                } else if ($tipo_pagamento === 'tef') {
+                    $woocommerce->session->payment_type = $_POST['tef'];
+
+                } else {
+                    $woocommerce->session->payment_type = $tipo_pagamento;
                 }
             } 
 			
@@ -422,7 +450,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                 echo $html;
 
-                $woocommerce->session->bandeira_cartao = null;
+                $woocommerce->session->payment_type = null;
                 $woocommerce->session->nome_cartao = null;
                 $woocommerce->session->numero_cartao = null;
                 $woocommerce->session->cpf_cartao = null;
@@ -499,9 +527,9 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				        <frete_total>0</frete_total>
 				        <moeda>BRL</moeda>
 				        <referencia>'. $order->id .'</referencia>
-                        <meio_de_pagamento>'. $this->get_payment_type() .'</meio_de_pagamento>';
+                        <meio_de_pagamento>'. $woocommerce->session->payment_type .'</meio_de_pagamento>';
 
-                if ($this->payment_type === 'cartao') {
+                if (preg_match('/^cartao/', $woocommerce->session->payment_type)) {
                     $xml .= '
                         <numero>'. $woocommerce->session->numero_cartao .'</numero>
 						<parcelas>'. $woocommerce->session->parcelas_cartao .'</parcelas>
@@ -520,7 +548,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				</carrinho>';
 				
 				if($this->debug=='yes') $this->log->add( $this->id, 'XML '. $xml );
-				
+		die();
 				$target = 'https://'. $this->ambiente .'.akatus.com/api/v1/carrinho.xml';
 				
 				if($this->debug=='yes') $this->log->add( $this->id, 'Ambiente: '. $this->ambiente );
@@ -868,7 +896,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                 }
 
-                return simplexml_load_string($resposta['body']);
+                $meios_pagamento = simplexml_load_string($resposta['body']);
+                if($this->debug=='yes') $this->log->add( $this->id, 'XML resposta dos meios de pagamento: '. print_r($meios_pagamento, true) );
+
+                return $meios_pagamento;
             }
 
             protected function get_cartoes_credito($xml) {
