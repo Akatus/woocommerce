@@ -82,7 +82,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		        $this->method_title = 'Akatus';
 				$this->icon 		= apply_filters('woocommerce_akatus_icon', WP_PLUGIN_URL . "/" . plugin_basename( dirname(__FILE__)) . '/imagens/akatus.png' );
 				$this->has_fields 	= true;
-				
+                $this->nip_url      = site_url() . '?wc-api=WC_Gateway_Akatus';
+
 				// Load the form fields.
 				$this->init_form_fields();
 				
@@ -189,7 +190,13 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 									'description' => __( 'Enable logging (<code>woocommerce/logs/akatus.txt</code>)', 'WC_Akatus' ), 
 									'default' => ''
 								),
-					
+                    'invoice_prefix' => array( 
+                                    'title' => __( 'URL para Notificação de Pagamentos Instantânea (NIP)', 'woocommerce' ),
+                                    'type' => 'text',
+                                    'description' => 'Esse é o endereço que deverá ser cadastrado na sua conta Akatus (Redirecionamentos, campo notificação de pagamentos instantânea)',
+                                    'default' => $this->nip_url,
+                                )
+                                
 					);
 		    
 		    } // End init_form_fields()
