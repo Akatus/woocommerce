@@ -29,6 +29,21 @@ Text domain: wc-akatus
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+define("AGUARDANDO_PAGAMENTO",  "Aguardando Pagamento");
+define("EM_ANALISE",            "Em Análise");
+define("COMPLETO",              "Completo");
+define("APROVADO",              "Aprovado");
+define("ESTORNADO",             "Estornado");
+define("DEVOLVIDO",             "Devolvido");
+define("CANCELADO",             "Cancelado");
+
+define("PENDIND",               "pending");
+define("FAILED",                "failed");
+define("ON_HOLD",               "on-hold");
+define("PROCESSING",            "processing");
+define("COMPLETED",             "completed");
+define("REFUNDED",              "refunded");
+define("CANCELLED",             "cancelled");
 
 /**
  * Check if WooCommerce is active
@@ -548,7 +563,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				</carrinho>';
 				
 				if($this->debug=='yes') $this->log->add( $this->id, 'XML '. $xml );
-		die();
+
 				$target = 'https://'. $this->ambiente .'.akatus.com/api/v1/carrinho.xml';
 				
 				if($this->debug=='yes') $this->log->add( $this->id, 'Ambiente: '. $this->ambiente );
@@ -699,76 +714,41 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					'redirect'	=> add_query_arg('order', $order->id, add_query_arg('key', $order->order_key, get_permalink(get_option('woocommerce_pay_page_id'))))
 				);
 			}
-			
-			
-			
-			
+
+
 			/**
 			 * Notification of status payments
 			 *
 			 */
 			function notificacao() {
 				global $woocommerce;
+
+                if ($this->debug=='yes') $this->log->add( $this->id, 'Notificação de pagamento recebida: '. print_r( $post, true ) );
 				
-				
-				// Existe um POST?
-				if( isset( $_POST ) ){
-					
-					$post = $_POST;
-					
-					// verificando se os dados vieram da Akatus
-					if( isset( $post['token'] ) && isset( $post['transacao_id'] ) && isset( $post['status'] ) && isset( $post['referencia'] ) ){
+                if(isset($_POST) && $_POST['token'] === $this->nip) {
 						
-						
-						if ($this->debug=='yes') $this->log->add( $this->id, 'Recebendo POST do NIP' );
-						if ($this->debug=='yes') $this->log->add( $this->id, 'Notificação de pagamento da Akatus recebida: '. print_r( $post, true ) );
-						
-						
-						if ($this->debug=='yes') $this->log->add( $this->id, 'Referência recebida: '. print_r( $post['referencia'], true ) );
-						
-						
-						// verificando se a transação existe
-						$transacao = get_post_meta( $post['referencia'], 'akatus_transacao' );
-						
-						// localizando pedido
-						$pedido = new WC_Order( $post['referencia'] );
-						
-						
-						if( isset($pedido->order_custom_fields ) ){
-							// removendo parte dos dados para melhorar a visualização
-							unset( $pedido->order_custom_fields );
-						}
-						
-						
-						if ($this->debug=='yes') $this->log->add( $this->id, 'Transação encontrada: '. print_r( $pedido, true ) );
-						
-						
-						/**
-						 * verificando se a transação existe e 
-						 * se o valor é identifico ao da loja
-						 */
-						if ( is_int( $pedido->id ) && $pedido->order_total == $post['valor_total'] ){
-							
-							
-							if ($this->debug=='yes') $this->log->add( $this->id, 'O valor da transação está correto.' );
-							
-							
-							if ($this->debug=='yes') $this->log->add( $this->id, 'Processando status do pagamento.' );
-							// alterando o status
-							$this->status_helper( $post['status'], $pedido );
-						}else{
-							
-							if ($this->debug=='yes') $this->log->add( $this->id, 'Pedido #'. $post['referencia'] .': O valor recebido pelo NIP é diferente do valor cobrado na loja, status não alterado.' );
-							if ($this->debug=='yes') $this->log->add( $this->id, 'Possível tentativa de burlar o pagamento' );
-							
-							wp_redirect( $this->get_return_url( $pedido ) );
-							
-						}
-					}
+                    $transacao = get_post_meta( $_POST['referencia'], 'akatus_transacao' );
+                    $pedido = new WC_Order( $_POST['referencia'] );
+                    
+                    if( isset($pedido->order_custom_fields ) ){
+                        unset( $pedido->order_custom_fields );
+                    }
+                    
+                    if ($this->debug=='yes') $this->log->add( $this->id, 'Transação encontrada: '. print_r( $pedido, true ) );
+                    
+                    $novoStatus = $this->status_helper($_POST['status'], $pedido->status);
+
+                    if ($novoStatus) {
+                        if ($novoStatus === COMPLETED) {
+                            $pedido->payment_complete();
+                        } else if($novoStatus === CANCELLED) {
+                            $pedido->cancel_order();
+                        } else {
+                            $pedido->update_status($novoStatus);
+                        }
+                    }
 				}
 			}
-			
-			
 			
 
 			/**
@@ -778,61 +758,86 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			 * @param unknown_type $order
 			 * @return unknown
 			 */
-			protected function status_helper( $status = null, $order = null ){
+			protected function status_helper($statusRecebido, $statusAtual){
 				global $woocommerce;
 				
-				switch ( $status ){
+				switch ($statusRecebido){
+
+					case AGUARDANDO_PAGAMENTO:
+                        $listaStatus = array(PENDING);                
+
+                        if (in_array($statusAtual, $listaStatus)) {
+                            return ON_HOLD;
+                        } else {
+                            return false;
+                        }
+
+					case EM_ANALISE:
+                        $listaStatus = array(PENDING);                
+
+                        if (in_array($statusAtual, $listaStatus)) {
+                            return ON_HOLD;
+                        } else {
+                            return false;
+                        }
+
+                    case COMPLETO:					
+					case APROVADO:
+                        $listaStatus = array(
+                            PENDING,
+                            ON_HOLD,
+                            PROCESSING
+                        );
+
+                        if (in_array($statusAtual, $listaStatus)) {
+                            return COMPLETED;
+                        } else {
+                            return false;
+                        }  					
 					
-					case "Aguardando Pagamento":
-						$arrStatus['status'] = "pending"; // aguardando pagamento
-						$arrStatus['log'] = __('Payment pending, Waiting payment confirmation', 'WC_Akatus'); // aguardando pagamento
+					case CANCELADO:
+                        $listaStatus = array(
+                            PENDING,
+                            FAILED,
+                            ON_HOLD,
+                            PROCESSING,
+                            COMPLETED
+                        );                
+
+                        if (in_array($statusAtual, $listaStatus)) {
+                            return CANCELLED;                    
+                        } else {
+                            return false;
+                        } 
+
+					case DEVOLVIDO:
+                        $listaStatus = array(
+                            PENDING,
+                            FAILED,
+                            ON_HOLD,
+                            PROCESSING,
+                            COMPLETED
+                        );                
+
+                        if (in_array($statusAtual, $listaStatus)) {
+                            return REFUNDED;                    
+                        } else {
+                            return false;
+                        } 
+
+					case ESTORNADO:
+                        $listaStatus = array(COMPLETED);                
+
+                        if (in_array($statusAtual, $listaStatus)) {
+                            return REFUNDED;                    
+                        } else {
+                            return false;
+                        } 
 						
-						// add note to control
-						$order->add_order_note( $arrStatus['log'] );
-						break;
-					
-					case "Em Análise":
-						$arrStatus['status'] = "pending"; // em analise
-						$arrStatus['log'] = __('Payment in analysis, Waiting payment confirmation', 'WC_Akatus');
-			    		
-						// add note to control
-						$order->add_order_note( $arrStatus['log'] );
-						break;
-					
-					case "Aprovado":
-						$arrStatus['status'] = "completed"; // paga
-						$arrStatus['log'] = __('Manual confirmation of payment, Check payment confirmation', 'WC_Akatus');
-						
-			    		// change payment status
-			    		$order->payment_complete();
-						break;
-					
-					
-					case "Cancelado":
-						$arrStatus['status'] = "cancelled"; // cancelada
-						$arrStatus['log'] = __('Order cancelled', 'WC_Akatus');
-						
-			    		// cancel this order 
-			    		$order->cancel_order( $order->id );
-						break;
-						
-					// improvavel mas nao custa prevenir
 					default:
-						$arrStatus['status'] = 'pending'; 
-						$arrStatus['log'] = __('Payment pending, Waiting payment confirmation', 'WC_Akatus');
-						
-						// add note to control
-						$order->add_order_note( $arrStatus['log'] );
+                        return false;
 				}
-				
-				
-				// Adicionando o log
-				if ($this->debug=='yes') $this->log->add( $this->id, 'Status do pagamento processado: '. $arrStatus['status'] );
-				
-				
-				return $arrStatus;
 			}
-			
 			
 			
 			protected function order_itens(){
