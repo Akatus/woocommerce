@@ -37,7 +37,7 @@ define("ESTORNADO",             "Estornado");
 define("DEVOLVIDO",             "Devolvido");
 define("CANCELADO",             "Cancelado");
 
-define("PENDIND",               "pending");
+define("PENDING",               "pending");
 define("FAILED",                "failed");
 define("ON_HOLD",               "on-hold");
 define("PROCESSING",            "processing");
@@ -433,7 +433,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
 			    if ($this->debug=='yes') $this->log->add( $this->id, 'Retorno de existe_transacao: '. print_r( $retorno, true ) );
 
-                switch ($this->payment_type) {
+                switch ($woocommerce->session->payment_type) {
                     case 'boleto':
                         $html = '<form action="'. esc_url( $this->url_retorno( $retorno->url_retorno ) ) .'" method="get" id="akatus_payment_form" target="_blank">
                                 <input type="submit" class="button-alt" id="submit_akatus_payment_form" value="Gerar Boleto" />
@@ -760,8 +760,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			 */
 			protected function status_helper($statusRecebido, $statusAtual){
 				global $woocommerce;
-				
-				switch ($statusRecebido){
+
+                switch ($statusRecebido){
 
 					case AGUARDANDO_PAGAMENTO:
                         $listaStatus = array(PENDING);                
@@ -795,7 +795,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                             return false;
                         }  					
 					
-					case CANCELADO:
+                    case CANCELADO:
                         $listaStatus = array(
                             PENDING,
                             FAILED,
