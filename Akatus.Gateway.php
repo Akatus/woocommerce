@@ -284,18 +284,18 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 foreach ($xml->meios_de_pagamento->meio_de_pagamento as $meio_de_pagamento) {
                     if(strval($meio_de_pagamento->descricao) === 'Boleto Bancário') {
                         echo "<div>";
-                        echo "  <input type='radio' name='akatus' value='boleto'><label>Boleto</label>";
+                        echo "  <input type='radio' name='akatus' value='boleto'><label><strong>Boleto</strong></label>";
                         echo "</div>";
                     }
 
                     if(strval($meio_de_pagamento->descricao) === 'TEF') {
-                        echo "<div>";
-                        echo "  <input type='radio' name='akatus' value='tef'><label>Transferência Eletrônica</label>";
+                        echo "<div style='margin: 5px 0;'>";
+                        echo "  <input type='radio' name='akatus' value='tef'><label><strong>Transferência Eletrônica</strong></label>";
                         echo "</div>";
                         foreach ($meio_de_pagamento->bandeiras->bandeira as $bandeira) {
                             $codigo = strval($bandeira->codigo);
                             $descricao = substr(strval($bandeira->descricao), 6, strlen($bandeira->descricao));
-                            echo "<div>";
+                            echo "<div style='margin-left: 28px;'>";
                             echo "  <input type='radio' name='tef' value='$codigo'><label>$descricao</label>";
                             echo "</div>";
                         }
@@ -309,8 +309,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 }
 
                 if (! empty($cartoes_credito)) {
-                    echo "<div>";
-                    echo "  <input type='radio' name='akatus' value='cartao'><label>Cartão de Crédito</label>";
+                    echo "<div style='margin: 5px 0;'>";
+                    echo "  <input type='radio' name='akatus' value='cartao'><label><strong>Cartão de Crédito</strong></label>";
                     echo "</div>";
                         
                     $parcelamento = $this->get_parcelamento();
@@ -319,34 +319,34 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     $parcelas_assumidas = $parcelamento["resposta"]["parcelas_assumidas"];
 
 
-                    echo "<div>";
+                    echo "<div style='margin: 5px 0 5px 28px;'>";
                     foreach ($cartoes_credito as $codigo => $descricao) {
                         echo "<input type='radio' name='bandeira_cartao' value='$codigo' id='$descricao' />";
-                        echo "<label for='$codigo'>$descricao</label>";
+                        echo "<label for='$codigo' style='margin-right: 1em;'>". substr($descricao, 8, strlen($descricao)) ."</label>";
                     }
                     echo "</div>";
 
-                    echo "<div>";
+                    echo "<div style='margin-left: 28px;'>";
                     echo "  <label for='nome_cartao'>Nome do portador</label>";
                     echo "  <input type='text' name='nome_cartao' id='nome_cartao'>";
                     echo "</div>";
 
-                    echo "<div>";
+                    echo "<div style='margin-left: 28px;'>";
                     echo "  <label for='cpf_cartao'>CPF do portador</label>";
                     echo "  <input type='text' name='cpf_cartao' id='cpf_cartao' maxlength='14' size='15'>";
                     echo "</div>";
 
-                    echo "<div>";
+                    echo "<div style='margin-left: 28px;'>";
                     echo "  <label for='numero_cartao'>Número do cartão</label>";
                     echo "  <input type='text' name='numero_cartao' id='numero_cartao' maxlength='20' size='21'>";
                     echo "</div>";
      
-                    echo "<div>";
+                    echo "<div style='margin-left: 28px;'>";
                     echo "  <label for='cvv_cartao'>CVV</label>";
                     echo "  <input type='text' name='cvv_cartao' id='cvv_cartao' maxlength='4' size='4'>";
                     echo "</div>";
 
-                    echo "<div>";
+                    echo "<div style='margin-left: 28px;'>";
                     echo "  <label for='mes_validade_cartao'>Data de validade</label>";
                     echo "  <select name='mes_validade_cartao'>";
                     echo "      <option value=''>Mês</option>";
@@ -364,7 +364,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     echo "  </select>";
                     echo "</div>";
 
-                    echo "<div>";
+                    echo "<div style='margin-left: 28px;'>";
                     echo "<label for='parcelas_cartao'>Parcelas</label>";
                     if(! empty($parcelamento['resposta']['parcelas'])) { 
 
@@ -404,26 +404,57 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		    
             public function validate_fields() {
                 global $woocommerce;
-
                 $tipo_pagamento = $_POST['akatus'];
 
-                if ($tipo_pagamento === 'cartao') {
-                    $woocommerce->session->payment_type = $_POST['bandeira_cartao'];
-                    $woocommerce->session->nome_cartao = $_POST['nome_cartao'];
-                    $woocommerce->session->numero_cartao = $_POST['numero_cartao'];
-                    $woocommerce->session->cpf_cartao = $_POST['cpf_cartao'];
-                    $woocommerce->session->cvv_cartao = $_POST['cvv_cartao'];
-                    $woocommerce->session->mes_validade_cartao = $_POST['mes_validade_cartao'];
-                    $woocommerce->session->ano_validade_cartao = $_POST['ano_validade_cartao'];
-                    $woocommerce->session->parcelas_cartao = $_POST['parcelas_cartao'];
-                    $woocommerce->session->telefone_cartao = $_POST['billing_phone'];
+                if ($tipo_pagamento) {
 
-                } else if ($tipo_pagamento === 'tef') {
-                    $woocommerce->session->payment_type = $_POST['tef'];
+                    if ($tipo_pagamento === 'cartao') {
+                        $bandeira_cartao = $_POST['bandeira_cartao'];
+                        $nome_cartao = $_POST['nome_cartao'];
+                        $numero_cartao = $_POST['numero_cartao'];
+                        $cpf_cartao = $_POST['cpf_cartao'];
+                        $cvv_cartao = $_POST['cvv_cartao'];
+                        $mes_validade_cartao = $_POST['mes_validade_cartao'];
+                        $ano_validade_cartao = $_POST['ano_validade_cartao'];
+                        $parcelas_cartao = $_POST['parcelas_cartao'];
+                        $telefone_cartao = $_POST['billing_phone'];
 
+                        if (! $bandeira_cartao) $woocommerce->add_error('Por favor escolha uma das bandeiras disponíveis.');
+                        if (! $nome_cartao) $woocommerce->add_error('Por favor preencha o nome do titular do cartão de crédito.');
+                        if (! $numero_cartao) $woocommerce->add_error('Por favor preencha o número do cartão de crédito.');
+                        if (! $cpf_cartao) $woocommerce->add_error('Por favor preencha o CPF do titular do cartão de crédito.');
+                        if (! $cvv_cartao) $woocommerce->add_error('Por favor preencha o CVV do cartão de crédito.');
+                        if (! $mes_validade_cartao) $woocommerce->add_error('Por favor escolha o mês de validade do cartão de crédito.');
+                        if (! $ano_validade_cartao) $woocommerce->add_error('Por favor escolha o ano de validade do cartão de crédito.');
+                        if (! $parcelas_cartao) $woocommerce->add_error('Por favor escolha o número de parcelas.');
+
+                        $woocommerce->session->payment_type = $bandeira_cartao;
+                        $woocommerce->session->nome_cartao = $nome_cartao;
+                        $woocommerce->session->numero_cartao = $numero_cartao;
+                        $woocommerce->session->cpf_cartao = $cpf_cartao;
+                        $woocommerce->session->cvv_cartao = $cvv_cartao;
+                        $woocommerce->session->mes_validade_cartao = $mes_validade_cartao;
+                        $woocommerce->session->ano_validade_cartao = $ano_validade_cartao;
+                        $woocommerce->session->parcelas_cartao = $parcelas_cartao;
+                        $woocommerce->session->telefone_cartao = $telefone_cartao;
+
+                    } else if ($tipo_pagamento === 'tef') {
+                        $valor = $_POST['tef'];
+
+                        if ($valor) {
+                            $woocommerce->session->payment_type = $valor;
+                        } else {
+                            $woocommerce->add_error('Por favor selecione uma das opções de transferência eletrônica.');
+                        }
+
+                    } else {
+                        $woocommerce->session->payment_type = $tipo_pagamento;
+                    }
+                    
                 } else {
-                    $woocommerce->session->payment_type = $tipo_pagamento;
+                    $woocommerce->add_error('Por favor escolha um dos meios de pagamento Akatus.');
                 }
+
             } 
 			
 			/**
