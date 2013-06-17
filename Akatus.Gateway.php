@@ -79,7 +79,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				
 				$this->id 			= 'akatus';
 		        $this->method_title = 'Akatus';
-				$this->icon 		= apply_filters('woocommerce_akatus_icon', WP_PLUGIN_URL . "/" . plugin_basename( dirname(__FILE__)) . '/imagens/akatus.png' );
 				$this->has_fields 	= true;
                 $this->nip_url      = site_url() . '?wc-api=WC_Gateway_Akatus';
 
@@ -333,27 +332,27 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                         echo "<div class='col-1'>";
 
                             echo "<p class='form-row'>";
-                            echo "  <label for='nome_cartao'>Nome do portador</label>";
+                            echo "  <label for='nome_cartao'>Nome do portador <abbr title='required' class='required'>*</abbr></label>";
                             echo "  <input type='text' name='nome_cartao' id='nome_cartao' class='input-text'>";
                             echo "</p>";
 
                             echo "<p class='form-row'>";
-                            echo "  <label for='cpf_cartao'>CPF do portador</label>";
+                            echo "  <label for='cpf_cartao'>CPF do portador <abbr title='required' class='required'>*</abbr></label>";
                             echo "  <input type='text' name='cpf_cartao' id='cpf_cartao' maxlength='14' class='input-text'>";
                             echo "</p>";
 
                             echo "<p class='form-row'>";
-                            echo "  <label for='numero_cartao'>Número do cartão</label>";
+                            echo "  <label for='numero_cartao'>Número do cartão <abbr title='required' class='required'>*</abbr></label>";
                             echo "  <input type='text' name='numero_cartao' id='numero_cartao' maxlength='20' class='input-text'>";
                             echo "</p>";
              
                             echo "<p class='form-row'>";
-                            echo "  <label for='cvv_cartao'>CVV</label>";
+                            echo "  <label for='cvv_cartao'>CVV <abbr title='required' class='required'>*</abbr></label>";
                             echo "  <input type='text' name='cvv_cartao' id='cvv_cartao' maxlength='4' size='6' class='input-text'>";
                             echo "</p>";
 
                             echo "<p class='form-row'>";
-                            echo "  <label for='mes_validade_cartao'>Data de validade</label>";
+                            echo "  <label for='mes_validade_cartao'>Data de validade <abbr title='required' class='required'>*</abbr></label>";
                             echo "  <select name='mes_validade_cartao'>";
                             echo "      <option value=''>Mês</option>";
                             for ($mes = 1; $mes <= 12; $mes++) {
@@ -371,7 +370,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                             echo "</p>";
 
                             echo "<p class='form-row-first'>";
-                            echo "<label for='parcelas_cartao'>Parcelas</label>";
+                            echo "<label for='parcelas_cartao'>Parcelas <abbr title='required' class='required'>*</abbr></label>";
                             if(! empty($parcelamento['resposta']['parcelas'])) { 
 
                             echo "<select name='parcelas_cartao'>";
@@ -432,14 +431,14 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                         $parcelas_cartao = $_POST['parcelas_cartao'];
                         $telefone_cartao = $_POST['billing_phone'];
 
-                        if (! $bandeira_cartao) $woocommerce->add_error('Por favor escolha uma das bandeiras disponíveis.');
-                        if (! $nome_cartao) $woocommerce->add_error('Por favor preencha o nome do titular do cartão de crédito.');
-                        if (! $numero_cartao) $woocommerce->add_error('Por favor preencha o número do cartão de crédito.');
-                        if (! $cpf_cartao) $woocommerce->add_error('Por favor preencha o CPF do titular do cartão de crédito.');
-                        if (! $cvv_cartao) $woocommerce->add_error('Por favor preencha o CVV do cartão de crédito.');
-                        if (! $mes_validade_cartao) $woocommerce->add_error('Por favor escolha o mês de validade do cartão de crédito.');
-                        if (! $ano_validade_cartao) $woocommerce->add_error('Por favor escolha o ano de validade do cartão de crédito.');
-                        if (! $parcelas_cartao) $woocommerce->add_error('Por favor escolha o número de parcelas.');
+                        if (! $bandeira_cartao) $woocommerce->add_error('Por favor, escolha uma das bandeiras disponíveis.');
+                        if (! $nome_cartao) $woocommerce->add_error('Por favor, preencha o nome do titular do cartão de crédito.');
+                        if (! preg_match('/\d{13,16}/', $numero_cartao)) $woocommerce->add_error('Por favor, preencha corretamente o número do cartão (somente os dígitos).');
+                        if (! preg_match('/\d{11}/', $cpf_cartao)) $woocommerce->add_error('Por favor, preencha corretamente o CPF do titular do cartão (somente os dígitos).');
+                        if (! preg_match('/\d{3,4}/', $cvv_cartao)) $woocommerce->add_error('Por favor, preencha corretamente o CVV do cartão (somente os dígitos).');
+                        if (! $mes_validade_cartao) $woocommerce->add_error('Por favor, escolha o mês de validade do cartão.');
+                        if (! $ano_validade_cartao) $woocommerce->add_error('Por favor, escolha o ano de validade do cartão.');
+                        if (! $parcelas_cartao) $woocommerce->add_error('Por favor, escolha o número de parcelas.');
 
                         $woocommerce->session->payment_type = $bandeira_cartao;
                         $woocommerce->session->nome_cartao = $nome_cartao;
