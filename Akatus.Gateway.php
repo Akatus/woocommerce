@@ -68,7 +68,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 		
 		add_filter('woocommerce_payment_gateways', 'add_akatus_gateway' );
 	
-		
 		class WC_Gateway_Akatus extends WC_Payment_Gateway {
 			
 			
@@ -128,9 +127,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 	
 				// Actions
 				add_action('woocommerce_receipt_akatus', array(&$this, 'receipt_page' ));
-				
+			    
+                wp_enqueue_script('akatus', plugin_dir_url(__FILE__) . 'js/akatus.js', array('jquery'), null, true);
 			}
-			
+
 			
 			/**
 		     * Initialise Gateway Settings Form Fields
@@ -292,13 +292,16 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                         echo "<div style='margin: 5px 0;'>";
                         echo "  <input type='radio' name='akatus' value='tef'><label><strong>Transferência Eletrônica</strong></label>";
                         echo "</div>";
-                        foreach ($meio_de_pagamento->bandeiras->bandeira as $bandeira) {
-                            $codigo = strval($bandeira->codigo);
-                            $descricao = substr(strval($bandeira->descricao), 6, strlen($bandeira->descricao));
-                            echo "<div style='margin-left: 28px;'>";
-                            echo "  <input type='radio' name='tef' value='$codigo'><label>$descricao</label>";
-                            echo "</div>";
-                        }
+
+                        echo "<div id='tef' style='display: none; margin: 15px 12px;'>";
+                            foreach ($meio_de_pagamento->bandeiras->bandeira as $bandeira) {
+                                $codigo = strval($bandeira->codigo);
+                                $descricao = substr(strval($bandeira->descricao), 6, strlen($bandeira->descricao));
+                                echo "<div>";
+                                echo "  <input type='radio' name='tef' value='$codigo'><label>$descricao</label>";
+                                echo "</div>";
+                            }
+                        echo "</div>";
                     }
 
                     if(strval($meio_de_pagamento->descricao) === 'Cartão de Crédito') {
@@ -318,85 +321,95 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     $juros =  str_replace("% ao mês","", $parcelamento["resposta"]["descricao"]);
                     $parcelas_assumidas = $parcelamento["resposta"]["parcelas_assumidas"];
 
+                    echo "<div id='cartao' style='display: none; margin-left: 12px;' class='col2-set'>";
 
-                    echo "<div style='margin: 5px 0 5px 28px;'>";
-                    foreach ($cartoes_credito as $codigo => $descricao) {
-                        echo "<input type='radio' name='bandeira_cartao' value='$codigo' id='$descricao' />";
-                        echo "<label for='$codigo' style='margin-right: 1em;'>". substr($descricao, 8, strlen($descricao)) ."</label>";
-                    }
-                    echo "</div>";
-
-                    echo "<div style='margin-left: 28px;'>";
-                    echo "  <label for='nome_cartao'>Nome do portador</label>";
-                    echo "  <input type='text' name='nome_cartao' id='nome_cartao'>";
-                    echo "</div>";
-
-                    echo "<div style='margin-left: 28px;'>";
-                    echo "  <label for='cpf_cartao'>CPF do portador</label>";
-                    echo "  <input type='text' name='cpf_cartao' id='cpf_cartao' maxlength='14' size='15'>";
-                    echo "</div>";
-
-                    echo "<div style='margin-left: 28px;'>";
-                    echo "  <label for='numero_cartao'>Número do cartão</label>";
-                    echo "  <input type='text' name='numero_cartao' id='numero_cartao' maxlength='20' size='21'>";
-                    echo "</div>";
-     
-                    echo "<div style='margin-left: 28px;'>";
-                    echo "  <label for='cvv_cartao'>CVV</label>";
-                    echo "  <input type='text' name='cvv_cartao' id='cvv_cartao' maxlength='4' size='4'>";
-                    echo "</div>";
-
-                    echo "<div style='margin-left: 28px;'>";
-                    echo "  <label for='mes_validade_cartao'>Data de validade</label>";
-                    echo "  <select name='mes_validade_cartao'>";
-                    echo "      <option value=''>Mês</option>";
-                    for ($mes = 1; $mes <= 12; $mes++) {
-                        echo "  <option value='$mes'>" . str_pad($mes, 2, '0', STR_PAD_LEFT) . "</option>";
-                    }
-                    echo "  </select>";
-
-                    echo "  <select name='ano_validade_cartao'>";
-                    echo "      <option value=''>Ano</option>";
-                    $anoAtual = intval(date('Y'));
-                    for ($ano = $anoAtual; $ano <= $anoAtual + 15; $ano++) {
-                        echo "  <option value='$ano'>$ano</option>";
-                    }
-                    echo "  </select>";
-                    echo "</div>";
-
-                    echo "<div style='margin-left: 28px;'>";
-                    echo "<label for='parcelas_cartao'>Parcelas</label>";
-                    if(! empty($parcelamento['resposta']['parcelas'])) { 
-
-                    echo "<select name='parcelas_cartao'>";
-
-                    $i = 1;
-                    foreach($parcelamento["resposta"]["parcelas"] as $parcela) {
-
-                        if($i > 1 && $i > $parcelas_assumidas){
-                           $aviso_juros = "(".$juros."% a.m)";
-                        } else {
-                           $aviso_juros = " sem juros";
+                        echo "<div style='margin: 15px 0;'>";
+                        foreach ($cartoes_credito as $codigo => $descricao) {
+                            echo "<input type='radio' name='bandeira_cartao' value='$codigo' id='$codigo' />";
+                            echo "<img src='" .plugin_dir_url(__FILE__). "imagens/$codigo.gif' style='cursor: pointer; margin-right: 2em;' class='bandeira' data-input='$codigo'>";
                         }
+                        echo "</div>";
 
-                        $valor_parcela_formatada = number_format($parcela['valor'], 2, ",", ".");
+                        echo "<div class='col-1'>";
 
-                        if($parcela['valor'] < 5 && $aviso_juros != " sem juros")
-                            continue;
+                            echo "<p class='form-row'>";
+                            echo "  <label for='nome_cartao'>Nome do portador</label>";
+                            echo "  <input type='text' name='nome_cartao' id='nome_cartao' class='input-text'>";
+                            echo "</p>";
 
-                        echo "<option value='{$i}'>{$i}x de R$ {$valor_parcela_formatada} {$aviso_juros}</option>";
+                            echo "<p class='form-row'>";
+                            echo "  <label for='cpf_cartao'>CPF do portador</label>";
+                            echo "  <input type='text' name='cpf_cartao' id='cpf_cartao' maxlength='14' class='input-text'>";
+                            echo "</p>";
 
-                        $i++;
-                    }
+                            echo "<p class='form-row'>";
+                            echo "  <label for='numero_cartao'>Número do cartão</label>";
+                            echo "  <input type='text' name='numero_cartao' id='numero_cartao' maxlength='20' class='input-text'>";
+                            echo "</p>";
+             
+                            echo "<p class='form-row'>";
+                            echo "  <label for='cvv_cartao'>CVV</label>";
+                            echo "  <input type='text' name='cvv_cartao' id='cvv_cartao' maxlength='4' size='6' class='input-text'>";
+                            echo "</p>";
 
-                    echo "</select>";
+                            echo "<p class='form-row'>";
+                            echo "  <label for='mes_validade_cartao'>Data de validade</label>";
+                            echo "  <select name='mes_validade_cartao'>";
+                            echo "      <option value=''>Mês</option>";
+                            for ($mes = 1; $mes <= 12; $mes++) {
+                                echo "  <option value='$mes'>" . str_pad($mes, 2, '0', STR_PAD_LEFT) . "</option>";
+                            }
+                            echo "  </select>";
 
-                    } else {
- 
-                        echo "<select name='parcelas_cartao'>";
-                        echo "  <option value='1'>1x de R$ " . number_format($woocommerce->cart->total, 2, ",", ".") . "</option>";
-                        echo "</select>";
-                    }
+                            echo "  <select name='ano_validade_cartao'>";
+                            echo "      <option value=''>Ano</option>";
+                            $anoAtual = intval(date('Y'));
+                            for ($ano = $anoAtual; $ano <= $anoAtual + 15; $ano++) {
+                                echo "  <option value='$ano'>$ano</option>";
+                            }
+                            echo "  </select>";
+                            echo "</p>";
+
+                            echo "<p class='form-row-first'>";
+                            echo "<label for='parcelas_cartao'>Parcelas</label>";
+                            if(! empty($parcelamento['resposta']['parcelas'])) { 
+
+                            echo "<select name='parcelas_cartao'>";
+
+                            $i = 1;
+                            foreach($parcelamento["resposta"]["parcelas"] as $parcela) {
+
+                                if($i > 1 && $i > $parcelas_assumidas){
+                                   $aviso_juros = "(".$juros."% a.m)";
+                                } else {
+                                   $aviso_juros = " sem juros";
+                                }
+
+                                $valor_parcela_formatada = number_format($parcela['valor'], 2, ",", ".");
+
+                                if($parcela['valor'] < 5 && $aviso_juros != " sem juros")
+                                    continue;
+
+                                echo "<option value='{$i}'>{$i}x de R$ {$valor_parcela_formatada} {$aviso_juros}</option>";
+
+                                $i++;
+                            }
+
+                            echo "</select>";
+
+                            } else {
+         
+                                echo "<select name='parcelas_cartao'>";
+                                echo "  <option value='1'>1x de R$ " . number_format($woocommerce->cart->total, 2, ",", ".") . "</option>";
+                                echo "</select>";
+                            }
+
+                            echo "</p>";
+
+                        echo "</div>";
+
+                        echo "<div class='col-2'>";
+                        echo "</div>";
 
                     echo "</div>";
                 }
