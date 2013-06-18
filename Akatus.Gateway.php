@@ -80,7 +80,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				$this->id 			= 'akatus';
 		        $this->method_title = 'Akatus';
 				$this->has_fields 	= true;
-                $this->nip_url      = site_url() . '?wc-api=WC_Gateway_Akatus';
+                $this->nip_url      = site_url() . '/?wc-api=WC_Gateway_Akatus';
 
 				// Load the form fields.
 				$this->init_form_fields();
