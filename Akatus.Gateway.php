@@ -780,8 +780,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     $transacao = get_post_meta( $_POST['referencia'], 'akatus_transacao' );
                     $pedido = new WC_Order( $_POST['referencia'] );
                     
-                    if( isset($pedido->order_custom_fields ) ){
-                        unset( $pedido->order_custom_fields );
+                    if(isset($pedido->order_custom_fields)){
+                        unset($pedido->order_custom_fields);
                     }
                     
                     if ($this->debug=='yes') $this->log->add( $this->id, 'Transação encontrada: '. print_r( $pedido, true ) );
@@ -790,7 +790,21 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                     if ($novoStatus) {
                         if ($novoStatus === COMPLETED) {
-                            $pedido->payment_complete();
+
+                            $pedido->update_status(COMPLETED);
+
+                            add_post_meta($pedido->id, '_paid_date', current_time('mysql'), true);
+
+                            $dados = array(
+                                'ID' => $pedido->id,
+                                'post_date' => current_time('mysql', 0),
+                                'post_date_gmt' => current_time('mysql', 1)
+                            );
+                            wp_update_post($dados);
+
+                            if (apply_filters('woocommerce_payment_complete_reduce_order_stock', true, $pedido->id))
+                                $pedido->reduce_order_stock();
+
                         } else if($novoStatus === CANCELLED) {
                             $pedido->cancel_order();
                         } else {
