@@ -1,19 +1,20 @@
 <?php
 /*
-Plugin Name: WooCommerce Akatus
-Plugin URI: http://johnhenrique.com/plugin/woocommerce-akatus/
-Description: Integração Akatus para WooCommerce. A Akatus dá ao WooCommerce a habilidade de receber pagamentos via boleto, transferencia eletrônica e cartão. É obrigatório ter uma conta confirmada no Gateway Akatus com acesso a API, você pode criar a sua na página <a href="http://goo.gl/ICz2O">Akatus API</a>.
-Version: 1.9
-Author: John-Henrique
-Author URI: http://johnhenrique.com/
+Plugin Name: WooCommerce Akatus Oficial
+Plugin URI: https://github.com/Akatus/woocommerce
+Description: Plugin oficial de integração com a Akatus via Woocommerce. Inicialmente baseado no plugin desenvolvido por John Henrique (http://johnhenrique.com/plugin/woocommerce-akatus/).
+Version: beta
+Author: Akatus
+Author URI: http://akatus.com/
 License: GPL2
 
-
 Requires at least: 3.5
-Tested up to: 3.5.1
+Tested up to: 3.5.2
 Text domain: wc-akatus
 */
-/*  Copyright 2013  John-Henrique  (email : para@johnhenrique.com)
+
+/*  Copyright 2013  Akatus
+    Copyright 2013  John-Henrique  (email : para@johnhenrique.com)
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License, version 2, as 
@@ -49,46 +50,29 @@ define("CANCELLED",             "cancelled");
  * Check if WooCommerce is active
  **/
 if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
-	
-	
 	add_action('plugins_loaded', 'woocommerce_gateway_akatus', 0);
 	
-	
-	
 	function woocommerce_gateway_akatus(){
-		
-		
 		if( !class_exists( 'WC_Payment_Gateway' ) ) return;
 	
-		/**
-	 	 * Localisation
-		 */
 		load_plugin_textdomain('WC_Akatus', false, dirname( plugin_basename( __FILE__ ) ) . '/languages');
-	    
-		
 		add_filter('woocommerce_payment_gateways', 'add_akatus_gateway' );
 	
 		class WC_Gateway_Akatus extends WC_Payment_Gateway {
 			
-			
 			public function __construct() {
 				global $woocommerce;
 				
-				$this->versao		= '1.9';
-				
+				$this->versao		= 'beta';
 				
 				$this->id 			= 'akatus';
 		        $this->method_title = 'Akatus';
 				$this->has_fields 	= true;
                 $this->nip_url      = site_url() . '/?wc-api=WC_Gateway_Akatus';
 
-				// Load the form fields.
 				$this->init_form_fields();
-				
-				// Load the settings.
 				$this->init_settings();
 				
-				// Define user set variables
 				$this->title 		= $this->settings['title'];
 				$this->description 	= $this->settings['description'];
 				$this->nip 			= $this->settings['nip'];
@@ -98,159 +82,126 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				$this->ambiente		= $this->settings['ambiente'];
 				$this->payment_type	= $this->settings['payment_type'];
 
-				
-				// completa a URL RestFull
 				if( ( $this->ambiente == 'dev' ) or ( $this->ambiente == '' ) ){
 					$this->ambiente = 'dev';
 				}else{
 					$this->ambiente = 'www';
 				}
 				
-				// Logs
 				if ($this->debug=='yes') $this->log = $woocommerce->logger();
 				
 				if ( !$this->is_valid_currency() || !$this->are_token_set() )
 					$this->enabled = false;
-					
 				
 				if ( version_compare( WOOCOMMERCE_VERSION, '2.0', '<' ) ) {
-					// Pre 2.0
 					add_action( 'woocommerce_update_options_payment_gateways', array(&$this, 'process_admin_options'));
 					add_action('init', array(&$this, 'notificacao' ));
-					//add_action('init', array(&$this, 'fix_url_order_received' )); no work in WC 2.0
 				} else {
-					// 2.0
 					add_action( 'woocommerce_update_options_payment_gateways_'. $this->id, array( $this, 'process_admin_options' ) );
 					add_action( 'woocommerce_api_'. strtolower( get_class( $this ) ), array( $this, 'notificacao' ) );
 				}
 	
-				// Actions
 				add_action('woocommerce_receipt_akatus', array(&$this, 'receipt_page' ));
-			    
+
                 wp_enqueue_script('akatus', plugin_dir_url(__FILE__) . 'js/akatus.js', array('jquery'), null, true);
 			}
 
-			
-			/**
-		     * Initialise Gateway Settings Form Fields
-		     */
 		    public function init_form_fields() {
 		    
 		    	$this->form_fields = array(
 					'enabled' => array(
-									'title' => __( 'Enable/Disable', 'WC_Akatus' ), 
-									'type' => 'checkbox', 
-									'label' => __( 'Enable Akatus standard', 'WC_Akatus' ), 
-									'default' => 'yes'
-								), 
+                            'title' => 'Habilitado', 
+                            'type' => 'select', 
+                            'options' => array('yes' => 'Sim', 'no' => 'Não'),
+                            'default' => 'yes'
+                        ), 
 					'title' => array(
-									'title' => __( 'Title', 'WC_Akatus' ), 
-									'type' => 'text', 
-									'description' => __( 'This controls the title which the user sees during checkout.', 'WC_Akatus' ), 
-									'default' => __( 'Akatus', 'WC_Akatus' )
-								),
+                            'title' => 'Título',
+                            'type' => 'text', 
+                            'description' => 'Esse é o texto que aparecerá durante o checkout.',
+                            'default' => 'Formas de Pagamento'
+                        ),
 					'description' => array(
-									'title' => __( 'Description', 'WC_Akatus' ), 
-									'type' => 'textarea', 
-									'description' => __( 'This controls the description which the user sees during checkout.', 'WC_Akatus' ), 
-									'default' => __("Pague com boleto bancário.", 'WC_Akatus')
-								),
+                            'title' => 'Descrição', 
+                            'type' => 'textarea', 
+                            'description' => 'Texto para mostrar no checkout, acima dos meios de pagamento.',
+                            'default' => 'Pague com boleto bancário.',
+                        ),
 					'email' => array(
-									'title' => __( 'Akatus Email', 'WC_Akatus' ), 
-									'type' => 'text', 
-									'description' => __( 'Please enter your Akatus email address; this is needed in order to take payment.', 'WC_Akatus' ), 
-									'default' => ''
-								),
+                            'title' => 'E-mail',
+                            'type' => 'text', 
+                            'description' => 'O e-mail utilizado no cadastro da Akatus.', 
+                            'default' => ''
+                        ),
 					'nip' => array(
-									'title' => __( 'Token NIP', 'WC_Akatus' ), 
-									'type' => 'text', 
-									'description' => __( 'This is used to connect in Akatus API. Change only if you change in your Akatus account. See <a href="https://www.akatus.com/painel/cart/token" target="_blank">Transaction code</a>', 'WC_Akatus' ), 
-									'default' => ''
-								),
+                            'title' => 'Token NIP', 
+                            'type' => 'text', 
+                            'description' => 'O Token disponibilizado na área autenticada da sua conta Akatus.', 
+                            'default' => ''
+                        ),
 					'key' => array(
-									'title' => __( 'API Key', 'WC_Akatus' ), 
-									'type' => 'text', 
-									'description' => __( 'Please enter your Akatus token; this is needed in order to take payment. See <a href="https://www.akatus.com/painel/cart/token" target="_blank">Token of security</a>', 'WC_Akatus' ), 
-									'default' => ''
-								),
+                            'title' => 'API Key', 
+                            'type' => 'text', 
+                            'description' => 'A API Key disponibilizada na área autenticada da sua conta Akatus.', 
+                            'default' => ''
+                        ),
 					'ambiente' => array(
-									'title' => __( 'Ambiente', 'WC_Akatus' ), 
-									'type' => 'select', 
-									'options' => array(
-										'dev' => __( "Testes", 'WC_Akatus' ), 
-										'www' => __( "Produção", 'WC_Akatus' ), 
-									),
-									'description' => __( 'Isto permite que você realize pagamentos fictícios, não gerando cobranças reais. Se sua loja ainda está em testes selecione "Testes".', 'WC_Akatus' ), 
-									'default' => 'www'
-								),
+                            'title' => 'Ambiente', 
+                            'type' => 'select', 
+                            'options' => array(
+                                'dev' => 'Sandbox', 
+                                'www' => 'Produção' 
+                            ),
+                            'description' => 'Com o ambiente sandbox é possível realizar transações de teste, utilizando uma conta específica criada em http://dev.akatus.com/', 
+                            'default' => 'www'
+                        ),
 					'debug' => array(
-									'title' => __( 'Enable/Disable Log', 'WC_Akatus' ), 
-									'type' => 'checkbox', 
-									'description' => __( 'Enable logging (<code>woocommerce/logs/akatus.txt</code>)', 'WC_Akatus' ), 
-									'default' => ''
-								),
+                            'title' => 'Habilitar Log?', 
+                            'type' => 'checkbox', 
+                            'description' => '* Criar o diretório <code>wp-content/plugins/woocommerce/logs</code>', 
+                            'default' => ''
+                        ),
                     'invoice_prefix' => array( 
-                                    'title' => __( 'URL para Notificação de Pagamentos Instantânea (NIP)', 'woocommerce' ),
-                                    'type' => 'text',
-                                    'description' => 'Esse é o endereço que deverá ser cadastrado na sua conta Akatus (Redirecionamentos, campo notificação de pagamentos instantânea)',
-                                    'default' => $this->nip_url,
-                                )
+                            'title' => 'URL para Notificação Instantânea de Pagamento (NIP)',
+                            'type' => 'text',
+                            'description' => 'Esse é o endereço que deverá ser cadastrado na sua conta Akatus (Redirecionamentos, campo notificação de pagamentos instantânea)',
+                            'default' => $this->nip_url,
+                        )
                                 
 					);
 		    
-		    } // End init_form_fields()
+		    }
 		    
-		    
-			/**
-			 * Admin Panel Options 
-			 * - Options for bits like 'title' and availability on a country-by-country basis
-			 *
-			 * @since 1.0.0
-			 */
 			public function admin_options() {
-		
 		    	?>
-		    	<h3><?php echo __('Akatus XML Básico', 'WC_Akatus'); ?></h3>
-		    	<p><?php echo __('É obrigatório ter uma conta confirmada no Gateway Akatus com acesso a API, você pode criar a sua na página <a href="http://goo.gl/ICz2O">Akatus API</a>.', 'WC_Akatus'); ?>
-		    	<?php echo __( "Conheça outros <a href='http://woocommerce.com.br/'>plugins para WooCommerce</a>"); ?>
-		    	</p>
 		    	<table class="form-table">
 					<?php if ( ! $this->is_valid_currency() ) : ?>
 						<div class="inline error">
-							<p><strong><?php _e( 'Gateway Disabled', 'WC_Akatus' ); ?></strong>: <?php _e( 'Akatus does not support your store\'s currency. You need to select the currency of Brazil Real.', 'WC_Akatus' ); ?></p>
+                            <p><strong><?php _e( 'Gateway Disabled', 'WC_Akatus' ); ?></strong>: A Akatus não oferece suporte para a moeda da sua loja. É necessário selecionar o Real Brasileiro.</p>
 						</div>
 					<?php endif; ?>
 					
 					<?php if ( ! $this->are_credentials_set() ) : ?>
 						<div class="inline error">
-							<p><strong><?php _e( 'Gateway Disabled', 'WC_Akatus' ); ?></strong>: <?php _e( 'You must give the token of your account email.', 'WC_Akatus' ); ?></p>
+							<p><strong><?php _e( 'Gateway Disabled', 'WC_Akatus' ); ?></strong>: You must give the token of your account email.</p>
 						</div>
 					<?php endif; ?>
+
+                <?php $this->generate_settings_html(); ?>
+
+                </table>
+
 		    	<?php
-		    		// Generate the HTML For the settings form.
-		    		$this->generate_settings_html();
-		    	?>
-				</table><!--/.form-table-->
-		    	<?php
-		    } // End admin_options()
+		    }
 		    
-	
-			// para token
 			protected function are_token_set(){
-				if( empty( $this->key ) ):
+                if( empty( $this->key ) ) {
 					return false;
-				endif;
-				
-				return true;
+                }
+                
+                return true;
 			}
 			
-		    
-			/**
-			 * Check if Akatus can be used with the store's currency.
-			 * For now only work with Real of Brazil, but...
-			 *
-			 * @since 1.0
-			 */
 			function is_valid_currency() {
 				if ( !in_array( get_option( 'woocommerce_currency' ), array( 'BRL' ) ) )
 					return false;
@@ -258,12 +209,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					return true;
 			}
 	
-	
-			/**
-			 * Check if Akatus Credentials are set
-			 *
-			 * @since 1.0
-			 */
 			function are_credentials_set() {
 				if( empty( $this->email ) || empty( $this->key ) || empty( $this->nip ) )
 					return false;
@@ -293,6 +238,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                         echo "</div>";
 
                         echo "<div id='tef' style='display: none; margin: 15px 12px;'>";
+                        echo "<p style='margin-bottom: 1em;'><strong>* Pode ser necessário desabilitar o bloqueio de popup</strong></p>";
+
                             foreach ($meio_de_pagamento->bandeiras->bandeira as $bandeira) {
                                 $codigo = strval($bandeira->codigo);
                                 $descricao = substr(strval($bandeira->descricao), 6, strlen($bandeira->descricao));
@@ -300,6 +247,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                                 echo "  <input type='radio' name='tef' value='$codigo'><label>$descricao</label>";
                                 echo "</div>";
                             }
+
                         echo "</div>";
                     }
 
@@ -469,9 +417,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
             } 
 			
-			/**
-			 * Generate the Akatus button link
-			 **/
             public function receipt_page( $order_id ) {
                 $html = '';
 				global $woocommerce;
@@ -499,19 +444,25 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                         break;
                     
                     default:
-                        if($retorno->status === 'erro'){
+                        if(isset($retorno) && isset($retorno->status)) {
+
+                            if($retorno->status === 'Aguardando Pagamento' || $retorno->status === 'Em Análise' || $retorno->status === 'Aprovado') {
+                                $html  ="<h3>Seu pedido foi realizado com sucesso.</h3>";
+                            } else {
+                                $html  ="<h3>Pagamento não autorizado. Consulte a sua operadora de cartão de crédito para maiores informações.</h3>";
+                            }
+                            
+                            if ($this->debug=='yes') $this->log->add( $this->id, 'Token inválido: '. $retorno->descricao );
+
+                        } else {
                             $html  ="<h3>Desculpe, não foi possível concluir o seu pedido.</h3>";
                             $html .="<p>Tente novamente. Se o problema persistir, entre em contato com o administrador da loja.</p>";
                             
-                            if ($this->debug=='yes') $this->log->add( $this->id, 'Token inválido/falso: '. $retorno->descricao );
-
-                        } else if($retorno->status === 'Em Análise' || $retorno->status === 'Aprovado') {
-                            $html  ="<h3>Seu pedido foi realizado com sucesso.</h3>";
-                        } else {
-                            $html  ="<h3>Pagamento não autorizado. Consulte a sua operadora de cartão de crédito para maiores informações.</h3>";
+                            if ($this->debug=='yes') $this->log->add( $this->id, 'Falha na requisição.' );
                         }
+
                         break;
-                }
+                    }
 
                 echo $html;
 
@@ -526,18 +477,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 $woocommerce->session->telefone_cartao = null;
 			}
 			
-			
-			/**
-			 * Process URL returned fixing the 
-			 * DEV URL return
-			 *
-			 * @param URL $url
-			 * @return URL fixed
-			 */
-			protected function url_retorno( $url = '' ){
-				
+			protected function url_retorno($url = ''){
 				if( $this->ambiente == 'dev' ){
-					
 					if ($this->debug=='yes') $this->log->add( $this->id, 'Corrigindo URL de desenvolvimento.' );
 					
 					return str_replace( 'https://www.akatus.com', 'https://'. $this->ambiente .'.akatus.com', $url );
@@ -546,9 +487,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				return $url;
 			}
 			
-			
-			
-			public function request_token_API( $order ){
+			public function request_token_API($order){
 				global $woocommerce;
 	
 				$order->billing_phone = str_replace(array('(', '-', ' ', ')'), '', $order->billing_phone);
@@ -625,11 +564,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 	        		'sslverify' => false, 
 	        	) );
 	        	
-	        	
 	        	if($this->debug=='yes') $this->log->add( $this->id, 'Requisitando token' );
 	        	
-	        	
-	        	// verificando se tudo correu bem
 	        	if( is_wp_error( $resposta ) ) {
 	        		if($this->debug=='yes') $this->log->add( $this->id, 'Erro ao requisitar token: '. print_r( $resposta, true ) );
 	        		
@@ -638,25 +574,11 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					if($this->debug=='yes') $this->log->add( $this->id, 'Retorno do token: '. print_r( $this->url_retorno( $resposta['body'] ), true ) );
 				}
 	        	
-	        	
 	        	if($this->debug=='yes') $this->log->add( $this->id, 'Requisição recebida' );
-	        	
 	        	
 				return $resposta['body'];
 			}
 			
-			
-			
-
-		    
-		    /**
-		     * Verifica se existe uma transação com o $order_id informado 
-		     * caso exista retorna o URL para a transação 
-		     * caso não exista, cria uma nova transação e retorna o URL
-		     *
-		     * @param Object order $order
-		     * @return String URL da transação ou um Array com informações sobre o erro
-		     */
 		    protected function existe_transacao( $order ){
 		    	global $post;
 		    	
@@ -680,35 +602,21 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				return $respostaXML;
 		    }
 			
-			
-			/**
-			 * Process data returned
-			 *
-			 * @param XML $resposta
-			 * @return URL to redirect
-			 */
-			protected function processa_retorno( $resposta ){
+			protected function processa_retorno($resposta){
 				global $post;
 				
+				if ($this->debug=='yes') $this->log->add($this->id, 'Processando XML retornado.');
 				
-				if ($this->debug=='yes') $this->log->add( $this->id, 'Processando XML retornado.' );
+				$respostaXML = simplexml_load_string($resposta);
 				
-				
-				// atalho
-				$respostaXML = simplexml_load_string( $resposta );
-				
-				
-				// houve algum erro?
-				if( $respostaXML->status == 'erro' ){
-					if($this->debug=='yes') $this->log->add( $this->id, 'Houve um erro: '. $respostaXML->descricao );
+				if($respostaXML->status == 'erro') {
+					if($this->debug=='yes') $this->log->add($this->id, 'Houve um erro: '. $respostaXML->descricao);
 				}
 				
 				return $respostaXML;
 			}
 			
-			
-            protected function get_payment_type()
-            {
+            protected function get_payment_type() {
                 global $woocommerce;
 
                 if ($this->payment_type === 'cartao') {
@@ -718,45 +626,25 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 return $this->payment_type;
             }			
 			
-			/**
-			 * Process the payment and return the result
-			 * checkout
-			 * checkout page
-			 * 
-			 **/
-			function process_payment( $order_id = 0 ) {
+			function process_payment($order_id = 0) {
 				global $woocommerce;
 				
-				
 				if ($this->debug=='yes') $this->log->add( $this->id, 'Processando pagamento (process_payment).' );
-				
-				
 				if($this->debug=='yes') $this->log->add( $this->id, 'WooCommerce '. WOOCOMMERCE_VERSION );
 				if($this->debug=='yes') $this->log->add( $this->id, 'WooCommerce '. get_class( $this ) .' '. $this->versao );
 				
-				
-				$order = &new WC_Order( $order_id );
+				$order = &new WC_Order($order_id);
 	
-				// clean cart
 				$woocommerce->cart->empty_cart();
 				
-				
-				// no uncomment
-				//$order->update_status('on-hold', __('Waiting payment', 'WC_Akatus' ));
-				
-				
-				// Empty awaiting payment session
 				if ( version_compare( WOOCOMMERCE_VERSION, '2.0', '<' ) ) {
 					// Pre 2.0
 					unset($_SESSION['order_awaiting_payment']);
 				} else {
-				// 2.0
+				    // 2.0
 					unset( $woocommerce->session->order_awaiting_payment );
 				}
 				
-				
-				
-				// add note to control
 				$order->add_order_note( __('Pedido recebido', 'WC_Akatus') );
 				
 				return array(
@@ -765,11 +653,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				);
 			}
 
-
-			/**
-			 * Notification of status payments
-			 *
-			 */
 			function notificacao() {
 				global $woocommerce;
 
@@ -814,14 +697,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				}
 			}
 			
-
-			/**
-			 * Helper to status of payments
-			 *
-			 * @param Status of gatewat $status
-			 * @param unknown_type $order
-			 * @return unknown
-			 */
 			protected function status_helper($statusRecebido, $statusAtual){
 				global $woocommerce;
 
@@ -903,22 +778,18 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				}
 			}
 			
-			
 			protected function order_itens(){
-				
 				$item_loop = 0;
 				$xml = '';
 				
 				$pedido = new WC_Order( $this->pedido_id );
 				
-				// Percorrendo Array de itens
 				foreach ( $pedido->get_items( ) as $item_pedido ){
 					
 					// verificando se existem itens
 					if( $item_pedido['qty'] ){
 					
 						$item_loop++;
-						
 						
 						// Preço do produto
 						$item_preco = $pedido->get_item_subtotal( $item_pedido, false );
@@ -949,7 +820,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     </correntista>
                 </meios_de_pagamento>';
 
-                if($this->debug=='yes') $this->log->add( $this->id, 'XML pedindo meios de pagamento: '. $xml );
+                if($this->debug=='yes') $this->log->add($this->id, 'XML pedindo meios de pagamento: '. $xml);
                 
                 $target = 'https://'. $this->ambiente .'.akatus.com/api/v1/meios-de-pagamento.xml';
                 
@@ -962,7 +833,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 if( is_wp_error( $resposta ) ) {
                     if($this->debug=='yes') $this->log->add( $this->id, 'Erro no pedido de meios de pagamento: '. print_r( $resposta, true ) );
                     return false;
-
                 }
 
                 $meios_pagamento = simplexml_load_string($resposta['body']);
@@ -1009,13 +879,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
             }
 		}
 	}
-	
 
 	function add_akatus_gateway( $methods ){
 	    $methods[] = 'WC_Gateway_Akatus'; return $methods;
 	}
-
 }
-
 
 ?>
