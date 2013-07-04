@@ -119,7 +119,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                             'title' => 'Título',
                             'type' => 'text', 
                             'description' => 'Esse é o texto que aparecerá durante o checkout.',
-                            'default' => 'Formas de Pagamento'
+                            'default' => 'Akatus'
                         ),
 					'description' => array(
                             'title' => 'Descrição', 
@@ -224,6 +224,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 if ($this->description) echo wpautop(wptexturize($this->description)); 
                 
                 $xml = $this->get_meios_pagamento();
+
+                if (strval($xml->status) === 'erro') {
+                    die("<p>Nenhuma forma de pagamento disponível.</p>");
+                }
 
                 foreach ($xml->meios_de_pagamento->meio_de_pagamento as $meio_de_pagamento) {
                     if(strval($meio_de_pagamento->descricao) === 'Boleto Bancário') {
@@ -446,7 +450,9 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     default:
                         if(isset($retorno) && isset($retorno->status)) {
 
-                            if($retorno->status === 'Aguardando Pagamento' || $retorno->status === 'Em Análise' || $retorno->status === 'Aprovado') {
+                            $status = strval($retorno->status);
+
+                            if($status === 'Aguardando Pagamento' || $status === 'Em Análise' || $status === 'Aprovado') {
                                 $html  ="<h3>Seu pedido foi realizado com sucesso.</h3>";
                             } else {
                                 $html  ="<h3>Pagamento não autorizado. Consulte a sua operadora de cartão de crédito para maiores informações.</h3>";
@@ -557,26 +563,26 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				
 				if($this->debug=='yes') $this->log->add( $this->id, 'Ambiente: '. $this->ambiente );
 				if($this->debug=='yes') $this->log->add( $this->id, 'URL: '. $target );
-				
-	        	$resposta = wp_remote_post( $target, array( 
-	        		'method' 	=> 'POST', 
-	        		'body' 		=> $xml, 
-	        		'sslverify' => false, 
-	        	) );
-	        	
-	        	if($this->debug=='yes') $this->log->add( $this->id, 'Requisitando token' );
-	        	
-	        	if( is_wp_error( $resposta ) ) {
-	        		if($this->debug=='yes') $this->log->add( $this->id, 'Erro ao requisitar token: '. print_r( $resposta, true ) );
-	        		
+
+                $curl = curl_init($target);
+                curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);
+                curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, 0);
+                curl_setopt($curl, CURLOPT_POST, 1);
+                curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-Type: text/xml'));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, "$xml");
+                curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+                $resposta = curl_exec($curl);
+                curl_close($curl);
+
+	        	if(! $resposta) {
+	        		if($this->debug=='yes') $this->log->add( $this->id, 'Erro efetuar transacao com a Akatus: '. print_r($resposta, true));
 	        		return false;
-				}else{
-					if($this->debug=='yes') $this->log->add( $this->id, 'Retorno do token: '. print_r( $this->url_retorno( $resposta['body'] ), true ) );
 				}
+                
+                if($this->debug=='yes') $this->log->add( $this->id, 'Resposta recebida da Akatus: '. print_r($resposta, true));
 	        	
-	        	if($this->debug=='yes') $this->log->add( $this->id, 'Requisição recebida' );
-	        	
-				return $resposta['body'];
+				return $resposta;
 			}
 			
 		    protected function existe_transacao( $order ){
