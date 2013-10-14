@@ -532,9 +532,9 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				    	'. $this->order_itens() .' 
 				    </produtos>
 				    <transacao>
-				        <desconto_total>0</desconto_total>
-				        <peso_total>0</peso_total>
-				        <frete_total>0</frete_total>
+				        <desconto>0</desconto>
+				        <peso>0</peso>
+				        <frete>'. $order->get_shipping() .'</frete>
 				        <moeda>BRL</moeda>
 				        <referencia>'. $order->id .'</referencia>
                         <meio_de_pagamento>'. $woocommerce->session->payment_type .'</meio_de_pagamento>';
