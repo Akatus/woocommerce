@@ -125,7 +125,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                             'title' => 'Descrição', 
                             'type' => 'textarea', 
                             'description' => 'Texto para mostrar no checkout, acima dos meios de pagamento.',
-                            'default' => 'Pague com boleto bancário.',
+                            'default' => 'Pagamento via Akatus',
                         ),
 					'email' => array(
                             'title' => 'E-mail',
