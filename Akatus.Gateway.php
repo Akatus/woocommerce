@@ -532,7 +532,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				    	'. $this->order_itens() .' 
 				    </produtos>
 				    <transacao>
-				        <desconto>0</desconto>
+				        <desconto>'. $order->get_total_discount() .'</desconto>
 				        <peso>0</peso>
 				        <frete>'. $order->get_shipping() .'</frete>
 				        <moeda>BRL</moeda>
