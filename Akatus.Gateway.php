@@ -347,7 +347,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                                 $valor_parcela_formatada = number_format($parcela['valor'], 2, ",", ".");
 
-                                if($parcela['valor'] < 5 && $aviso_juros != " sem juros")
+                                if($parcela['valor'] < 5)
                                     continue;
 
                                 echo "<option value='{$i}'>{$i}x de R$ {$valor_parcela_formatada} {$aviso_juros}</option>";
