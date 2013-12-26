@@ -9,7 +9,7 @@ Author URI: http://akatus.com/
 License: GPL2
 
 Requires at least: 3.5
-Tested up to: 3.5.2
+Tested up to: 3.7
 Text domain: wc-akatus
 */
 
@@ -76,14 +76,15 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				$this->title 		= $this->settings['title'];
 				$this->description 	= $this->settings['description'];
 				$this->nip 			= $this->settings['nip'];
+				$this->public_token	= $this->settings['public_token'];
 				$this->key 			= $this->settings['key'];
 				$this->email		= $this->settings['email'];
 				$this->debug		= $this->settings['debug'];	
 				$this->ambiente		= $this->settings['ambiente'];
 				$this->payment_type	= $this->settings['payment_type'];
 
-				if( ( $this->ambiente == 'dev' ) or ( $this->ambiente == '' ) ){
-					$this->ambiente = 'dev';
+				if( ( $this->ambiente == 'sandbox' ) or ( $this->ambiente == '' ) ){
+					$this->ambiente = 'sandbox';
 				}else{
 					$this->ambiente = 'www';
 				}
@@ -136,7 +137,13 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					'nip' => array(
                             'title' => 'Token NIP', 
                             'type' => 'text', 
-                            'description' => 'O Token disponibilizado na área autenticada da sua conta Akatus.', 
+                            'description' => 'O Token NIP disponibilizado na área autenticada da sua conta Akatus.', 
+                            'default' => ''
+                        ),
+					'public_token' => array(
+                            'title' => 'Public Token', 
+                            'type' => 'text', 
+                            'description' => 'O Public Token disponibilizado na área autenticada da sua conta Akatus.', 
                             'default' => ''
                         ),
 					'key' => array(
@@ -149,10 +156,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                             'title' => 'Ambiente', 
                             'type' => 'select', 
                             'options' => array(
-                                'dev' => 'Sandbox', 
+                                'sandbox' => 'Sandbox', 
                                 'www' => 'Produção' 
                             ),
-                            'description' => 'Com o ambiente sandbox é possível realizar transações de teste, utilizando uma conta específica criada em http://dev.akatus.com/', 
+                            'description' => 'Com o ambiente sandbox é possível realizar transações de teste, utilizando uma conta específica criada em http://sandbox.akatus.com/', 
                             'default' => 'www'
                         ),
 					'debug' => array(
@@ -164,7 +171,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     'invoice_prefix' => array( 
                             'title' => 'URL para Notificação Instantânea de Pagamento (NIP)',
                             'type' => 'text',
-                            'description' => 'Esse é o endereço que deverá ser cadastrado na sua conta Akatus (Redirecionamentos, campo notificação de pagamentos instantânea)',
+                            'description' => 'Esse é o endereço que adeverá ser cadastrado na sua conta Akatus (Integração > Notificações)',
                             'default' => $this->nip_url,
                         )
                                 
@@ -183,7 +190,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					
 					<?php if ( ! $this->are_credentials_set() ) : ?>
 						<div class="inline error">
-							<p><strong><?php _e( 'Gateway Disabled', 'WC_Akatus' ); ?></strong>: You must give the token of your account email.</p>
+							<p><strong><?php _e( 'Gateway Disabled', 'WC_Akatus' ); ?></strong>: Preencha o e-mail, API Key, Token NIP e Public Token.</p>
 						</div>
 					<?php endif; ?>
 
@@ -210,7 +217,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			}
 	
 			function are_credentials_set() {
-				if( empty( $this->email ) || empty( $this->key ) || empty( $this->nip ) )
+				if( empty($this->email) || empty($this->key) || empty($this->nip) || empty($this->public_token) )
 					return false;
 				else
 					return true;
@@ -230,6 +237,8 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 }
 
                 foreach ($xml->meios_de_pagamento->meio_de_pagamento as $meio_de_pagamento) {
+
+
                     if(strval($meio_de_pagamento->descricao) === 'Boleto Bancário') {
                         echo "<div>";
                         echo "  <input type='radio' name='akatus' value='boleto'><label><strong>Boleto</strong></label>";
@@ -364,13 +373,24 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                     echo "</div>";
                 }
+
+                $this->include_akatus_js();
 		    }
 		    
             public function validate_fields() {
                 global $woocommerce;
+
+                $fingerprint_akatus = isset($_POST['fingerprint_akatus']) ? $_POST['fingerprint_akatus'] : '';
+                $fingerprint_partner_id = isset($_POST['fingerprint_partner_id']) ? $_POST['fingerprint_partner_id'] : '';
+                $ip = filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+
                 $tipo_pagamento = $_POST['akatus'];
 
                 if ($tipo_pagamento) {
+
+                    $woocommerce->session->fingerprint_akatus = $fingerprint_akatus;
+                    $woocommerce->session->fingerprint_partner_id = $fingerprint_partner_id;
+                    $woocommerce->session->ip = $ip;
 
                     if ($tipo_pagamento === 'cartao') {
                         $bandeira_cartao = $_POST['bandeira_cartao'];
@@ -481,17 +501,37 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 $woocommerce->session->ano_validade_cartao = null;
                 $woocommerce->session->parcelas_cartao = null;
                 $woocommerce->session->telefone_cartao = null;
+                $woocommerce->session->fingerprint_akatus = null;
+                $woocommerce->session->fingerprint_partner_id = null;
+                $woocommerce->session->ip = null;
 			}
 			
 			protected function url_retorno($url = ''){
-				if( $this->ambiente == 'dev' ){
-					if ($this->debug=='yes') $this->log->add( $this->id, 'Corrigindo URL de desenvolvimento.' );
-					
+				if( $this->ambiente == 'sandbox' ){
 					return str_replace( 'https://www.akatus.com', 'https://'. $this->ambiente .'.akatus.com', $url );
 				}
 				
 				return $url;
 			}
+
+            protected function include_akatus_js(){
+                $is_sandbox = false;
+
+                if ($this->ambiente == 'sandbox') {
+                    $is_sandbox = true;
+                }
+
+                echo "<script>";
+                echo "  jQuery.getScript('https://static.akatus.com/js/akatus.min.js', function() {";
+                echo "    var formulario = jQuery('form.checkout');";
+                echo "    var config = {";
+                if ($is_sandbox) { echo "sandbox: true,"; }
+                echo "      publicToken: '$this->public_token'";
+                echo "    };";
+                echo "    Akatus.init(formulario, config);";
+                echo "  });";
+                echo "</script>";
+            }
 			
 			public function request_token_API($order){
 				global $woocommerce;
@@ -499,6 +539,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				$order->billing_phone = str_replace(array('(', '-', ' ', ')'), '', $order->billing_phone);
 				$ddd = substr($order->billing_phone, 0, 2 );
 				$telefone = substr($order->billing_phone, 2 );
+
 				
 				$xml = '
 				<carrinho>
@@ -532,6 +573,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				    	'. $this->order_itens() .' 
 				    </produtos>
 				    <transacao>
+                        <ip>'. $woocommerce->session->ip .'</ip>
+                        <fingerprint_akatus>'. $woocommerce->session->fingerprint_akatus .'</fingerprint_akatus>
+                        <fingerprint_partner_id>'. $woocommerce->session->fingerprint_partner_id .'</fingerprint_partner_id>
+
 				        <desconto>'. $order->get_total_discount() .'</desconto>
 				        <peso>0</peso>
 				        <frete>'. $order->get_shipping() .'</frete>
@@ -556,7 +601,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 $xml .= '
 				    </transacao>				    
 				</carrinho>';
-				
+
 				if($this->debug=='yes') $this->log->add( $this->id, 'XML '. $xml );
 
 				$target = 'https://'. $this->ambiente .'.akatus.com/api/v1/carrinho.xml';
