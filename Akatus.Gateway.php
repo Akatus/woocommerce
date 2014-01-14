@@ -723,9 +723,9 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     $novoStatus = $this->status_helper($_POST['status'], $pedido->status);
 
                     if ($novoStatus) {
-                        if ($novoStatus === COMPLETED) {
+                        if ($novoStatus === PROCESSING) {
 
-                            $pedido->update_status(COMPLETED);
+                            $pedido->update_status(PROCESSING);
 
                             add_post_meta($pedido->id, '_paid_date', current_time('mysql'), true);
 
@@ -771,16 +771,14 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                             return false;
                         }
 
-                    case COMPLETO:					
 					case APROVADO:
                         $listaStatus = array(
                             PENDING,
-                            ON_HOLD,
-                            PROCESSING
+                            ON_HOLD
                         );
 
                         if (in_array($statusAtual, $listaStatus)) {
-                            return COMPLETED;
+                            return PROCESSING;
                         } else {
                             return false;
                         }  					
