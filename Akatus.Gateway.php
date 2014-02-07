@@ -382,7 +382,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 
                 $fingerprint_akatus = isset($_POST['fingerprint_akatus']) ? $_POST['fingerprint_akatus'] : '';
                 $fingerprint_partner_id = isset($_POST['fingerprint_partner_id']) ? $_POST['fingerprint_partner_id'] : '';
-                $ip = filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+                $ip = $this->get_ip();
 
                 $tipo_pagamento = $_POST['akatus'];
 
@@ -925,6 +925,26 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                 $resposta = wp_remote_get($target);
 
                 return json_decode($resposta['body'], $assoc = true);
+            }
+
+            protected function get_ip() {
+                $keys = array(
+                    'HTTP_CLIENT_IP',
+                    'HTTP_X_FORWARDED_FOR',
+                    'HTTP_X_FORWARDED',
+                    'HTTP_X_CLUSTER_CLIENT_IP',
+                    'HTTP_FORWARDED_FOR',
+                    'HTTP_FORWARDED',
+                    'REMOTE_ADDR'
+                );
+
+                foreach ($keys as $key) {
+                    if (array_key_exists($key, $_SERVER)) {
+                        if (filter_var($_SERVER[$key], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                            return $_SERVER[$key];
+                        } 
+                    }
+                }
             }
 		}
 	}
