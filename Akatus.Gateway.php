@@ -632,23 +632,33 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			
 		    protected function existe_transacao( $order ){
 		    	global $post;
-		    	
+                global $wpdb;
+
                 $respostaXML = $this->processa_retorno( $this->request_token_API( $order ) );
 
-                if ($this->debug=='yes') $this->log->add( $this->id, 'Criando transação: '. $transacao );
-                
-                $carrinho 		= str_replace( '', '', $respostaXML->carrinho );
+                $transacao		= strval($respostaXML->transacao);
                 $url_retorno	= strval($this->url_retorno( $respostaXML->url_retorno ));
-                $transacao		= str_replace( '', '', $respostaXML->transacao );
 
-                // código do carrinho na Akatus
-                update_post_meta( $post->ID, 'akatus_carrinho', $carrinho );
-                
                 // código da transação na Akatus
-                update_post_meta( $post->ID, 'akatus_transacao', $transacao );
+                $wpdb->insert($wpdb->prefix."postmeta",
+                    array(
+                        'post_id'       => $order->id,
+                        'meta_key'      => 'akatus_transacao',
+                        'meta_value'    => $transacao
+                    )
+                );
 
-                // Endereço do boleto na akatus
-                update_post_meta( $post->ID, 'akatus_url_retorno', $url_retorno );
+                if (! empty($url_retorno)) {
+
+                // Endereço do boleto/tef
+                    $wpdb->insert($wpdb->prefix."postmeta",
+                        array(
+                            'post_id'       => $order->id,
+                            'meta_key'      => 'akatus_url_retorno',
+                            'meta_value'    => $url_retorno
+                        )
+                    );
+                }
 		    	
 				return $respostaXML;
 		    }
@@ -707,10 +717,13 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			function notificacao() {
 				global $woocommerce;
 
-                if ($this->debug=='yes') $this->log->add( $this->id, 'Notificação de pagamento recebida: '. print_r( $post, true ) );
-				
-                if(isset($_POST) && $_POST['token'] === $this->nip) {
-						
+                if (isset($_GET['refund_order'])) {
+                    $this->akatus_refund($_GET['refund_order']);
+                
+                } else if(isset($_POST) && $_POST['token'] === $this->nip) {
+
+                    if ($this->debug=='yes') $this->log->add( $this->id, 'Notificação de pagamento recebida: '. print_r( $post, true ) );
+                        
                     $transacao = get_post_meta( $_POST['referencia'], 'akatus_transacao' );
                     $pedido = new WC_Order( $_POST['referencia'] );
                     
@@ -748,6 +761,41 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				}
 			}
 			
+            function akatus_refund($order_id) {
+
+                $akatus_transaction_id = array_shift(get_metadata('post', $order_id, 'akatus_transacao'));
+
+                $json_object = new stdClass();
+                $json_object->estorno = new stdClass();
+                $json_object->estorno->transacao = $akatus_transaction_id;
+                $json_object->estorno->api_key = $this->key;
+                $json_object->estorno->email = $this->email;
+
+                $target = 'https://'. $this->ambiente .'.akatus.com/api/v1/estornar-transacao.json';
+                
+                $resposta = wp_remote_post( $target, array( 
+                    'method' 	=> 'POST', 
+                    'body' 		=> json_encode($json_object), 
+                    'sslverify' => false, 
+                ) );
+
+                if( ! is_wp_error( $resposta ) ) {
+                    $json_resposta = json_decode($resposta['body'], $assoc = true);
+
+                    if ($json_resposta['resposta']['codigo-retorno'] == 0) {
+
+                        $order = new WC_Order($order_id);
+                        $order->update_status(REFUNDED);
+                        if($this->debug=='yes') $this->log->add( $this->id, "Estorno realizado com sucesso. ID pedido: $order_id, ID Akatus: $akatus_transaction_id");
+
+                    } else {
+                        if($this->debug=='yes') $this->log->add( $this->id, 'Nao foi possivel realizar o estorno: '. print_r( $resposta, true ) );
+                    }
+                }
+
+                header("Location: " . $_SERVER['HTTP_REFERER']);
+            }
+
 			protected function status_helper($statusRecebido, $statusAtual){
 				global $woocommerce;
 
@@ -946,12 +994,27 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
                     }
                 }
             }
+
+
+            static function add_refund_link($column) {
+                global $the_order;
+
+                if (in_array($the_order->status, array('processing', 'completed')) && $column == 'order_actions') {
+
+                    $url = site_url() . "/?wc-api=WC_Gateway_Akatus&refund_order=" . $the_order->id;
+                    echo "<button class='button widefat' href='$url' onclick=this.disabled='disabled';>estornar</button>";
+                }
+            }
 		}
 	}
 
 	function add_akatus_gateway( $methods ){
 	    $methods[] = 'WC_Gateway_Akatus'; return $methods;
 	}
+
+
+    add_action('manage_shop_order_posts_custom_column', array('WC_Gateway_Akatus','add_refund_link'));
+
 }
 
 ?>
